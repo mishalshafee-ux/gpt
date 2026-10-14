@@ -329,6 +329,7 @@ input{padding:12px;border:1px solid #51435b;border-radius:10px;background:#120f1
 @media(max-width:650px){#layout{grid-template-columns:1fr}#messages{height:45vh}}
 
 .visitor-category{margin:16px 0 6px;color:#ffad66;font-weight:700}
+.panel .bubble.human{background:#483254!important;color:#fff!important}
 </style></head><body>
 <header><b>ee.gpt · Admin inbox</b><button id="logout">Log out</button></header>
 <section id="login"><h2>Admin login</h2><form id="loginform">
