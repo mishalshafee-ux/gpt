@@ -241,14 +241,14 @@ ADMIN_PAGE = r"""<!doctype html>
 <html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ee.gpt admin</title><style>
 *{box-sizing:border-box}body{margin:0;background:#100d18;color:#f7edf9;font:15px system-ui;cursor:crosshair}
-header{padding:16px 22px;background:white;display:flex;justify-content:space-between}
-button{border:0;border-radius:10px;padding:11px 15px;background:#293a30;color:white;font:inherit;cursor:pointer}
-input{padding:12px;border:1px solid #ddd;border-radius:10px;font:inherit}
-#login{max-width:380px;margin:12vh auto;background:white;padding:24px;border-radius:18px}#login input{display:block;width:100%;margin:8px 0}
+header{padding:16px 22px;background:#1b1626;color:#f7edf9;border-bottom:1px solid #453250;display:flex;justify-content:space-between}
+button{border:0;border-radius:10px;padding:11px 15px;background:#f27b35;color:#160d1c;font:inherit;font-weight:700;cursor:pointer}
+input{padding:12px;border:1px solid #51435b;border-radius:10px;background:#120f19;color:#fff;font:inherit}
+#login{max-width:380px;margin:12vh auto;background:#1b1626;color:#f7edf9;padding:24px;border:1px solid #453250;border-radius:18px}#login input{display:block;width:100%;margin:8px 0}
 #layout{display:none;max-width:1100px;margin:22px auto;padding:0 14px;grid-template-columns:320px 1fr;gap:16px}
-.panel{background:white;border:1px solid #e8e7e2;border-radius:16px;padding:16px;min-height:0}
-.item{padding:12px;border-bottom:1px solid #403449;cursor:pointer}.item:hover{background:#f7f7f3}
-#messages{height:55vh;overflow:auto}.bubble{padding:12px 14px;border-radius:15px;background:#30263b;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.panel{background:#1b1626;color:#f7edf9;border:1px solid #453250;border-radius:16px;padding:16px;min-height:0}
+.item{padding:12px;border-bottom:1px solid #403449;cursor:pointer}.item:hover{background:#382943;color:#ffbd83}
+#messages{height:55vh;overflow:auto}.panel h2,#login h2{color:#ffad66}.bubble{padding:12px 14px;border-radius:15px;background:#30263b;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .human{background:#dcebdc;margin-left:auto;width:fit-content;max-width:85%}
 .bubble img,.bubble video{display:block;max-width:min(100%,440px);max-height:340px;border-radius:9px;margin-top:8px}
 .reply{display:flex;gap:8px;margin-top:10px}.reply input[type=text]{flex:1;min-width:0}
