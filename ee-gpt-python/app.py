@@ -118,6 +118,12 @@ def login():
     session["admin"] = username
     return jsonify(ok=True)
 
+@app.get("/api/me")
+def current_admin():
+    if session.get("admin") not in admins:
+        return jsonify(authenticated=False), 401
+    return jsonify(authenticated=True, username=session["admin"])
+
 @app.post("/api/logout")
 def logout():
     session.clear()
@@ -212,6 +218,7 @@ h1{font-size:19px;margin:0 0 4px;color:#ffad66}.muted{color:#c1b3cb;font-size:13
 form{display:flex;gap:8px;align-items:center}.text{min-width:0;flex:1;padding:13px;border:1px solid #51435b;border-radius:12px;font:inherit;background:#120f19;color:#fff}
 input[type=file]{max-width:180px;font-size:12px}.fine{font-size:12px;color:#777;margin:8px 2px 0}
 @media(max-width:650px){.layout{grid-template-columns:1fr;height:100dvh;padding:8px;gap:8px}aside{max-height:150px}.brand{padding:0 4px 8px}.history{display:flex;gap:4px}.chatitem{min-width:120px}.main{min-height:0}input[type=file]{max-width:100px}}
+#history .chatitem.active,#history .chatitem:hover{background:#382943!important;color:#ffbd83!important}
 </style></head><body><div class="layout">
 <aside><div class="brand" id="brand">ee.gpt 🎃</div><button id="new">＋ New chat</button><div class="history" id="history"></div></aside>
 <section class="main"><div class="head"><h1 id="title">New chat</h1>
@@ -274,6 +281,13 @@ if(r.ok){document.querySelector("#login").style.display="none";document.querySel
 document.querySelector("#reply").onsubmit=async e=>{e.preventDefault();if(!selected)return alert("Choose a chat first.");let data=new FormData();data.append("text",document.querySelector("#answer").value);for(const f of document.querySelector("#files").files)data.append("files",f);
 let r=await fetch("/api/admin/conversations/"+selected+"/messages",{method:"POST",body:data});if(r.ok){document.querySelector("#answer").value="";document.querySelector("#files").value="";load()}else alert((await r.json()).error||"Could not send reply.")};
 document.querySelector("#logout").onclick=async()=>{await fetch("/api/logout",{method:"POST"});location.reload()};
+fetch("/api/me").then(r=>r.ok?r.json():null).then(user=>{
+if(user?.authenticated){
+document.querySelector("#login").style.display="none";
+document.querySelector("#layout").style.display="grid";
+document.querySelector("#logout").style.display="inline-block";
+load();
+}});
 setInterval(()=>{if(document.querySelector("#layout").style.display==="grid")load()},3000);
 </script></body></html>"""
 
