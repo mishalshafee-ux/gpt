@@ -158,6 +158,20 @@ def new_conversation():
         save_chats()
     return jsonify(chat)
 
+@app.post("/api/conversations/<chat_id>/rename")
+def visitor_rename_chat(chat_id):
+    chat = find_chat(chat_id)
+    if chat is None or chat.get("owner") != visitor_id():
+        return jsonify(error="Chat not found."), 404
+    data = request.get_json(silent=True) or {}
+    title = str(data.get("title", "")).strip()[:40]
+    if not title:
+        return jsonify(error="Enter a chat name."), 400
+    with LOCK:
+        chat["title"] = title
+        save_chats()
+    return jsonify(ok=True, title=title)
+
 @app.get("/api/conversations/<chat_id>")
 def visitor_get_chat(chat_id):
     chat = find_chat(chat_id)
@@ -219,6 +233,9 @@ form{display:flex;gap:8px;align-items:center}.text{min-width:0;flex:1;padding:13
 input[type=file]{max-width:180px;font-size:12px}.fine{font-size:12px;color:#777;margin:8px 2px 0}
 @media(max-width:650px){.layout{grid-template-columns:1fr;height:100dvh;padding:8px;gap:8px}aside{max-height:150px}.brand{padding:0 4px 8px}.history{display:flex;gap:4px}.chatitem{min-width:120px}.main{min-height:0}input[type=file]{max-width:100px}}
 #history .chatitem.active,#history .chatitem:hover{background:#382943!important;color:#ffbd83!important}
+
+#history .chatitem{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#history .rename{padding:3px 8px;background:transparent;color:#ffbd83;font-size:14px}
 </style></head><body><div class="layout">
 <aside><div class="brand" id="brand">ee.gpt 🎃</div><button id="new">＋ New chat</button><div class="history" id="history"></div></aside>
 <section class="main"><div class="head"><h1 id="title">New chat</h1>
@@ -228,19 +245,69 @@ input[type=file]{max-width:180px;font-size:12px}.fine{font-size:12px;color:#777;
 <input type="file" id="files" accept="image/*,video/mp4,video/webm,video/quicktime" multiple>
 <button>Send</button></form><div class="fine">Images and videos · 25 MB maximum per message</div>
 </div></section></div><script>
-let ids=JSON.parse(localStorage.eeChatIds||"[]"),current=localStorage.eeCurrentChat||"",drawn="",listSignature="";
+let ids=JSON.parse(localStorage.eeChatIds||"[]"),current=localStorage.eeCurrentChat||"";
+let lastList=[],listSignature="",displayedChat="",displayedMessages="";
 const box=document.querySelector("#messages");
 function saveIds(){localStorage.eeChatIds=JSON.stringify(ids);localStorage.eeCurrentChat=current}
-function drawHistory(list){let sig=list.map(c=>c.id+":"+(c.messages.length||0)).join("|");if(sig===listSignature)return;listSignature=sig;let h=document.querySelector("#history");h.innerHTML="";
-list.forEach((c,i)=>{let d=document.createElement("div");d.className="chatitem"+(c.id===current?" active":"");d.textContent=(c.messages.at(-1)?.text||"Chat "+(i+1)).slice(0,25);d.onclick=()=>openChat(c.id);h.append(d)})}
-function show(c){current=c.id;saveIds();drawHistory([c,...ids.filter(id=>id!==c.id).map(id=>({id,messages:[]}))]);let sig=JSON.stringify(c.messages);if(sig===drawn)return;drawn=sig;box.innerHTML="";
-for(const m of c.messages){let d=document.createElement("div");d.className="bubble "+(m.from==="human"?"human":"");if(m.text)d.append(document.createTextNode(m.text));for(const a of (m.attachments||[])){let el=document.createElement(a.kind==="video"?"video":"img");el.src=a.url;if(a.kind==="video")el.controls=true;d.append(el)}box.append(d)}box.scrollTop=box.scrollHeight}
-async function openChat(id){let r=await fetch("/api/conversations/"+id);if(r.ok)show(await r.json())}
-async function refresh(){let url="/api/conversations?legacy="+encodeURIComponent(ids.join(","));let r=await fetch(url);if(!r.ok)return;let list=await r.json();ids=list.map(c=>c.id);saveIds();drawHistory(list);if(current&&ids.includes(current)){let cr=await fetch("/api/conversations/"+current);if(cr.ok)show(await cr.json())}else if(list.length){current=list[0].id;openChat(current)}}
-async function createChat(){let r=await fetch("/api/conversations",{method:"POST"});let c=await r.json();ids.unshift(c.id);current=c.id;drawn="";saveIds();await refresh()}
+function drawHistory(list){
+ const sig=current+"|"+list.map(c=>c.id+":"+c.title+":"+c.messages.length).join("|");
+ if(sig===listSignature)return;
+ listSignature=sig;
+ const h=document.querySelector("#history");h.innerHTML="";
+ list.forEach((c,i)=>{
+  const row=document.createElement("div");
+  row.className="chatitem"+(c.id===current?" active":"");
+  if(c.id===current){row.style.setProperty("background","#382943","important");row.style.setProperty("color","#ffbd83","important")}
+  const label=document.createElement("span");
+  label.textContent=(c.title||(c.messages.at(-1)?.text||"Chat "+(i+1))).slice(0,25);
+  label.onclick=()=>openChat(c.id);
+  const edit=document.createElement("button");
+  edit.type="button";edit.className="rename";edit.textContent="✎";edit.title="Rename chat";
+  edit.onclick=async e=>{
+   e.stopPropagation();
+   const name=prompt("Rename this chat:",c.title||"");
+   if(!name||!name.trim())return;
+   const r=await fetch("/api/conversations/"+c.id+"/rename",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title:name.trim()})});
+   if(r.ok)refresh();else alert((await r.json()).error||"Could not rename chat.");
+  };
+  row.append(label,edit);row.onclick=()=>openChat(c.id);h.append(row);
+ });
+}
+function show(c){
+ current=c.id;saveIds();drawHistory(lastList);
+ const sig=JSON.stringify(c.messages);
+ if(displayedChat===c.id&&displayedMessages===sig)return;
+ displayedChat=c.id;displayedMessages=sig;box.innerHTML="";
+ for(const m of c.messages){
+  const d=document.createElement("div");d.className="bubble "+(m.from==="human"?"human":"");
+  if(m.text)d.append(document.createTextNode(m.text));
+  for(const a of (m.attachments||[])){const el=document.createElement(a.kind==="video"?"video":"img");el.src=a.url;if(a.kind==="video")el.controls=true;d.append(el)}
+  box.append(d);
+ }
+ box.scrollTop=box.scrollHeight;
+}
+async function openChat(id){const r=await fetch("/api/conversations/"+id);if(r.ok)show(await r.json())}
+async function refresh(){
+ const r=await fetch("/api/conversations?legacy="+encodeURIComponent(ids.join(",")));
+ if(!r.ok)return;
+ lastList=await r.json();ids=lastList.map(c=>c.id);saveIds();drawHistory(lastList);
+ if(current&&ids.includes(current)){await openChat(current)}
+ else if(lastList.length){current=lastList[0].id;await openChat(current)}
+ else await createChat();
+}
+async function createChat(){
+ const r=await fetch("/api/conversations",{method:"POST"});if(!r.ok)return;
+ const c=await r.json();ids.unshift(c.id);current=c.id;displayedChat="";listSignature="";saveIds();await refresh();
+}
 document.querySelector("#new").onclick=createChat;
-document.querySelector("#form").onsubmit=async e=>{e.preventDefault();let text=document.querySelector("#text"),files=document.querySelector("#files");if(!current)await createChat();let data=new FormData();data.append("text",text.value);for(const f of files.files)data.append("files",f);
-let r=await fetch("/api/conversations/"+current+"/messages",{method:"POST",body:data});if(r.ok){text.value="";files.value="";drawn="";refresh()}else alert((await r.json()).error||"Could not send message.")};
+document.querySelector("#form").onsubmit=async e=>{
+ e.preventDefault();const text=document.querySelector("#text"),files=document.querySelector("#files");
+ if(!current)await createChat();
+ const data=new FormData();data.append("text",text.value);for(const f of files.files)data.append("files",f);
+ const r=await fetch("/api/conversations/"+current+"/messages",{method:"POST",body:data});
+ if(r.ok){text.value="";files.value="";displayedMessages="";refresh()}
+ else alert((await r.json()).error||"Could not send message.");
+};
 let clicks=0;document.querySelector("#brand").onclick=()=>{clicks++;if(clicks>=5){clicks=0;document.querySelector("#brand").textContent="ee.gpt 👻✨";setTimeout(()=>document.querySelector("#brand").textContent="ee.gpt 🎃",2500)}};
 refresh();setInterval(refresh,7000);</script></body></html>"""
 
@@ -260,6 +327,8 @@ input{padding:12px;border:1px solid #51435b;border-radius:10px;background:#120f1
 .bubble img,.bubble video{display:block;max-width:min(100%,440px);max-height:340px;border-radius:9px;margin-top:8px}
 .reply{display:flex;gap:8px;margin-top:10px}.reply input[type=text]{flex:1;min-width:0}
 @media(max-width:650px){#layout{grid-template-columns:1fr}#messages{height:45vh}}
+
+.visitor-category{margin:16px 0 6px;color:#ffad66;font-weight:700}
 </style></head><body>
 <header><b>ee.gpt · Admin inbox</b><button id="logout">Log out</button></header>
 <section id="login"><h2>Admin login</h2><form id="loginform">
@@ -270,12 +339,45 @@ input{padding:12px;border:1px solid #51435b;border-radius:10px;background:#120f1
 <form class="reply" id="reply"><input type="text" id="answer" placeholder="Write a reply…">
 <input type="file" id="files" accept="image/*,video/mp4,video/webm,video/quicktime" multiple><button>Send</button></form></section></div>
 <script>
-let selected=null;
-function attachment(a,d){let el=document.createElement(a.kind==="video"?"video":"img");el.src=a.url;if(a.kind==="video")el.controls=true;d.append(el)}
-function show(c){document.querySelector("#title").textContent="Chat";let box=document.querySelector("#messages");box.innerHTML="";
-for(let m of c.messages){let d=document.createElement("div");d.className="bubble "+(m.from==="human"?"human":"");if(m.text)d.append(document.createTextNode((m.from==="human"?(m.by||"Team")+": ":"Visitor: ")+m.text));for(const a of (m.attachments||[]))attachment(a,d);box.append(d)}box.scrollTop=box.scrollHeight}
-async function load(){let r=await fetch("/api/admin/conversations");if(!r.ok)return;let all=await r.json(),list=document.querySelector("#chats");list.innerHTML="";
-all.forEach((c,i)=>{let d=document.createElement("div");d.className="item";d.textContent="Chat "+(all.length-i)+" · "+(c.messages.at(-1)?.text||"Attachment").slice(0,45);d.onclick=()=>{selected=c.id;show(c)};list.append(d)});if(selected){let c=all.find(x=>x.id===selected);if(c)show(c)}}
+let selected=null,adminSig="",shownChat="",shownMessages="";
+function show(c){
+ const sig=JSON.stringify(c.messages);
+ if(shownChat===c.id&&shownMessages===sig)return;
+ shownChat=c.id;shownMessages=sig;
+ document.querySelector("#title").textContent=c.title||"Chat";
+ const box=document.querySelector("#messages");box.innerHTML="";
+ for(const m of c.messages){
+  const d=document.createElement("div");d.className="bubble "+(m.from==="human"?"human":"");
+  if(m.text)d.append(document.createTextNode((m.from==="human"?"":"Visitor: ")+m.text));
+  for(const a of (m.attachments||[])){const el=document.createElement(a.kind==="video"?"video":"img");el.src=a.url;if(a.kind==="video")el.controls=true;d.append(el)}
+  box.append(d);
+ }
+ box.scrollTop=box.scrollHeight;
+}
+async function load(){
+ const r=await fetch("/api/admin/conversations");if(!r.ok)return;
+ const all=await r.json();
+ const sig=all.map(c=>c.id+":"+(c.owner||"legacy")+":"+(c.title||"")+":"+c.messages.length).join("|");
+ if(sig!==adminSig){
+  adminSig=sig;
+  const list=document.querySelector("#chats");list.innerHTML="";
+  const groups=new Map();
+  for(const c of all){const key=c.owner||"legacy";if(!groups.has(key))groups.set(key,[]);groups.get(key).push(c)}
+  let person=0;
+  for(const [owner,items] of groups){
+   const heading=document.createElement("div");heading.className="visitor-category";
+   heading.textContent=owner==="legacy"?"Earlier chats":"Visitor "+(++person)+" · "+items.length+" chat"+(items.length===1?"":"s");
+   list.append(heading);
+   items.forEach((c,i)=>{
+    const d=document.createElement("div");d.className="item";
+    d.textContent=c.title||(c.messages.at(-1)?.text||"Chat "+(i+1)).slice(0,45);
+    d.onclick=()=>{selected=c.id;shownChat="";show(c)};
+    list.append(d);
+   });
+  }
+ }
+ if(selected){const c=all.find(x=>x.id===selected);if(c)show(c)}
+}
 document.querySelector("#loginform").onsubmit=async e=>{e.preventDefault();let r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:document.querySelector("#username").value,password:document.querySelector("#password").value})});
 if(r.ok){document.querySelector("#login").style.display="none";document.querySelector("#layout").style.display="grid";load()}else document.querySelector("#error").textContent="Login failed."};
 document.querySelector("#reply").onsubmit=async e=>{e.preventDefault();if(!selected)return alert("Choose a chat first.");let data=new FormData();data.append("text",document.querySelector("#answer").value);for(const f of document.querySelector("#files").files)data.append("files",f);
