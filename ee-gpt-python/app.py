@@ -182,13 +182,63 @@ def visitor_get_chat(chat_id):
 @app.post("/api/conversations/<chat_id>/messages")
 def visitor_send(chat_id):
     chat = find_chat(chat_id)
-    if chat is None or chat.get("owner") != visitor_id():
+    expected_owner = ("account:" + session["account_id"]
+                      if session.get("account_id") else visitor_id())
+    if chat is None or chat.get("owner") != expected_owner:
         return jsonify(error="Chat not found."), 404
+
+    mode = request.form.get("mode", "human")
+    if mode not in ("human", "ai"):
+        return jsonify(error="Choose Human reply or AI reply."), 400
+    files = request.files.getlist("files")
+    text = request.form.get("text", "").strip()[:2000]
+    if not text:
+        return jsonify(error="Write a message first."), 400
+    if mode == "ai":
+        if not os.environ.get("OPENROUTER_API_KEY"):
+            return jsonify(error="AI replies are not configured on the server."), 503
+        if any(f and f.filename for f in files):
+            return jsonify(error="AI mode is text-only for now. Choose Human reply to attach files."), 400
+
     with LOCK:
-        if not add_message(chat, request.form.get("text", ""), request.files.getlist("files"), "visitor"):
-            return jsonify(error="Write a message or attach an image/video."), 400
+        add_message(chat, text, [], "visitor")
         save_chats()
-    return jsonify(ok=True)
+
+    if mode == "ai":
+        try:
+            from openai import OpenAI
+            client = OpenAI(
+                api_key=os.environ["OPENROUTER_API_KEY"],
+                base_url="https://openrouter.ai/api/v1",
+            )
+            history = []
+            for m in chat["messages"][-20:]:
+                content = (m.get("text") or "").strip()
+                if content:
+                    role = "user" if m.get("from") == "visitor" else "assistant"
+                    history.append({"role": role, "content": content})
+            result = client.chat.completions.create(
+                model=os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+                messages=[
+                    {"role": "system", "content":
+                     "You are ee.gpt, a helpful, clear AI assistant. Answer directly and be honest when uncertain."},
+                    *history,
+                ],
+                max_tokens=600,
+            )
+            answer = result.choices[0].message.content
+            if not answer:
+                raise RuntimeError("Empty response from provider")
+            with LOCK:
+                chat["messages"].append({
+                    "text": answer, "from": "ai", "at": time.time(), "attachments": []
+                })
+                save_chats()
+        except Exception:
+            app.logger.exception("OpenRouter request failed")
+            return jsonify(error="AI reply failed. Check the server logs and model setting."), 502
+
+    return jsonify(ok=True, mode=mode)
 
 @app.get("/api/admin/conversations")
 def admin_get_chats():
@@ -226,7 +276,7 @@ button{border:0;background:#f27b35;color:#160d1c;border-radius:11px;padding:11px
 h1{font-size:19px;margin:0 0 4px;color:#ffad66}.muted{color:#c1b3cb;font-size:13px}
 #messages{flex:1;overflow:auto;padding:12px 6px}
 .bubble{width:fit-content;max-width:85%;padding:12px 15px;border-radius:16px;background:#30263b;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}
-.bubble.human{margin-left:auto;background:#483254}
+.bubble.ai{background:#e8f0ff}.bubble.human{margin-left:auto;background:#483254}
 .bubble img,.bubble video{display:block;max-width:min(100%,480px);max-height:360px;border-radius:10px;margin-top:8px}
 .composer{border-top:1px solid #eee;padding-top:12px}
 form{display:flex;gap:8px;align-items:center}.text{min-width:0;flex:1;padding:13px;border:1px solid #51435b;border-radius:12px;font:inherit;background:#120f19;color:#fff}
@@ -241,7 +291,7 @@ input[type=file]{max-width:180px;font-size:12px}.fine{font-size:12px;color:#777;
 <section class="main"><div class="head"><h1 id="title">New chat</h1>
 <div class="muted">Replies may be written by our support team.</div></div>
 <div id="messages"></div><div class="composer">
-<form id="form"><input class="text" id="text" maxlength="2000" placeholder="Message ee.gpt…">
+<form id="form"><select id="replyMode" aria-label="Reply type"><option value="human">Human reply</option><option value="ai">AI reply</option></select><input class="text" id="text" maxlength="2000" placeholder="Message ee.gpt…">
 <input type="file" id="files" accept="image/*,video/mp4,video/webm,video/quicktime" multiple>
 <button>Send</button></form><div class="fine">Images and videos · 25 MB maximum per message</div>
 </div></section></div><script>
@@ -279,7 +329,7 @@ function show(c){
  if(displayedChat===c.id&&displayedMessages===sig)return;
  displayedChat=c.id;displayedMessages=sig;box.innerHTML="";
  for(const m of c.messages){
-  const d=document.createElement("div");d.className="bubble "+(m.from==="human"?"human":"");
+  const d=document.createElement("div");d.className="bubble "+(m.from==="human"?"human":m.from==="ai"?"ai":"");
   if(m.text)d.append(document.createTextNode(m.text));
   for(const a of (m.attachments||[])){const el=document.createElement(a.kind==="video"?"video":"img");el.src=a.url;if(a.kind==="video")el.controls=true;d.append(el)}
   box.append(d);
@@ -303,7 +353,7 @@ document.querySelector("#new").onclick=createChat;
 document.querySelector("#form").onsubmit=async e=>{
  e.preventDefault();const text=document.querySelector("#text"),files=document.querySelector("#files");
  if(!current)await createChat();
- const data=new FormData();data.append("text",text.value);for(const f of files.files)data.append("files",f);
+ const data=new FormData();data.append("mode",document.querySelector("#replyMode").value);data.append("text",text.value);for(const f of files.files)data.append("files",f);
  const r=await fetch("/api/conversations/"+current+"/messages",{method:"POST",body:data});
  if(r.ok){text.value="";files.value="";displayedMessages="";refresh()}
  else alert((await r.json()).error||"Could not send message.");
