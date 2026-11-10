@@ -286,10 +286,35 @@ input[type=file]{max-width:180px;font-size:12px}.fine{font-size:12px;color:#777;
 
 #history .chatitem{display:flex;align-items:center;justify-content:space-between;gap:8px}
 #history .rename{padding:3px 8px;background:transparent;color:#ffbd83;font-size:14px}
+
+/* ee.gpt clean light theme */
+*{cursor:auto!important}
+body{background:#fff!important;color:#252525!important;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important}
+.layout{max-width:1280px!important;grid-template-columns:260px minmax(0,1fr)!important;gap:0!important;padding:0!important}
+aside{background:#f7f7f8!important;border:0!important;border-right:1px solid #e5e5e5!important;border-radius:0!important;box-shadow:none!important}
+.main{max-width:900px!important;width:100%!important;margin:0 auto!important;background:#fff!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+.brand{color:#222!important}
+#new{background:#fff!important;color:#222!important;border:1px solid #ddd!important}
+#history .chatitem,#history .chatitem.active,#history .chatitem:hover{background:transparent!important;color:#333!important}
+#history .chatitem.active,#history .chatitem:hover{background:#e9e9eb!important}
+#history .rename{color:#555!important}
+h1{color:#252525!important}
+.muted,.fine{color:#777!important}
+.head{border-color:#e5e5e5!important}
+.bubble{background:#f1f1f1!important;color:#222!important;border-radius:18px!important}
+.bubble.human{background:#e8e8e8!important}
+.bubble.ai{background:#f7f7f8!important;border:1px solid #e5e5e5!important}
+.composer{background:#fff!important;border-color:#ddd!important;border-radius:24px!important}
+.text{background:transparent!important;color:#222!important}
+#replyMode{border:1px solid #ddd!important;border-radius:10px!important;padding:9px!important;background:#fff!important;color:#333!important}
+button{background:#252525!important;color:#fff!important;box-shadow:none!important}
+button:hover{background:#444!important;transform:none!important}
+@media(max-width:650px){.layout{grid-template-columns:1fr!important}aside{border-right:0!important;border-bottom:1px solid #e5e5e5!important}}
+
 </style></head><body><div class="layout">
-<aside><div class="brand" id="brand">ee.gpt 🎃</div><button id="new">＋ New chat</button><div class="history" id="history"></div></aside>
+<aside><div class="brand" id="brand">ee.gpt</div><button id="new">＋ New chat</button><div class="history" id="history"></div></aside>
 <section class="main"><div class="head"><h1 id="title">New chat</h1>
-<div class="muted">Replies may be written by our support team.</div></div>
+<div class="muted">Choose an AI reply or a reply from our team.</div></div>
 <div id="messages"></div><div class="composer">
 <form id="form"><select id="replyMode" aria-label="Reply type"><option value="human">Human reply</option><option value="ai">AI reply</option></select><input class="text" id="text" maxlength="2000" placeholder="Message ee.gpt…">
 <input type="file" id="files" accept="image/*,video/mp4,video/webm,video/quicktime" multiple>
@@ -358,7 +383,7 @@ document.querySelector("#form").onsubmit=async e=>{
  if(r.ok){text.value="";files.value="";displayedMessages="";refresh()}
  else alert((await r.json()).error||"Could not send message.");
 };
-let clicks=0;document.querySelector("#brand").onclick=()=>{clicks++;if(clicks>=5){clicks=0;document.querySelector("#brand").textContent="ee.gpt 👻✨";setTimeout(()=>document.querySelector("#brand").textContent="ee.gpt 🎃",2500)}};
+let clicks=0;document.querySelector("#brand").onclick=()=>{clicks++;if(clicks>=5){clicks=0;document.querySelector("#brand").textContent="ee.gpt 👻✨";setTimeout(()=>document.querySelector("#brand").textContent="ee.gpt",2500)}};
 refresh();setInterval(refresh,7000);</script></body></html>"""
 
 ADMIN_PAGE = r"""<!doctype html>
@@ -380,6 +405,20 @@ input{padding:12px;border:1px solid #51435b;border-radius:10px;background:#120f1
 
 .visitor-category{margin:16px 0 6px;color:#ffad66;font-weight:700}
 .panel .bubble.human{background:#483254!important;color:#fff!important}
+
+/* ee.gpt clean light admin theme */
+*{cursor:auto!important}
+body{background:#f7f7f8!important;color:#252525!important;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important}
+header{background:#fff!important;color:#252525!important;border-color:#e5e5e5!important}
+.panel,#login{background:#fff!important;color:#252525!important;border:1px solid #e5e5e5!important;box-shadow:0 8px 30px #0000000a!important}
+.panel h2,#login h2,.visitor-category{color:#252525!important}
+button{background:#252525!important;color:#fff!important}
+input{background:#fff!important;color:#252525!important;border-color:#ddd!important}
+.item{border-color:#eee!important;color:#333!important}
+.item:hover{background:#f1f1f1!important;color:#222!important}
+.bubble{background:#f1f1f1!important;color:#222!important}
+.panel .bubble.human{background:#e8e8e8!important;color:#222!important}
+
 </style></head><body>
 <header><b>ee.gpt · Admin inbox</b><button id="logout">Log out</button></header>
 <section id="login"><h2>Admin login</h2><form id="loginform">
